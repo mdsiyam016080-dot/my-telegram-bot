@@ -1,0 +1,34 @@
+name: Telegram AI Bot 24/7 Uptime
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  schedule:
+    # প্রতি ৫ ঘণ্টা পরপর অটোমেটিক ওয়ার্কফ্লো রিস্টার্ট হবে যেনActions ৬ ঘণ্টার লিমিটে বন্ধ না হয়
+    - cron: "0 */5 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository Code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js Environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Run Bot with Auto-Restart Safeguard
+      run: |
+        echo "🚀 Starting 24/7 Telegram Bot..."
+        # স্ক্রিপ্টটি কোনো কারণে ক্র্যাশ করলে সাথে সাথে আবার রিস্টার্ট নেবে
+        until npm start; do
+          echo "⚠️ Bot crashed with exit code $?. Restarting in 5 seconds..." >&2
+          sleep 5
+        done
