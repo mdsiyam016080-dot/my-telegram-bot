@@ -26,18 +26,26 @@ function getUserRole(userId) {
     return 0;
 }
 
-// Load Commands from commands folder
+// Load Commands dynamically supporting both GoatBot and standard formats
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
     const files = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'));
     for (const file of files) {
         try {
-            const cmd = require(path.join(commandsPath, file));
-            if (cmd.config && cmd.config.name) {
-                global.GoatBot.commands.set(cmd.config.name, cmd);
-                if (cmd.config.aliases) {
-                    const aliases = Array.isArray(cmd.config.aliases) ? cmd.config.aliases : [cmd.config.aliases];
-                    aliases.forEach(alias => global.GoatBot.aliases.set(alias, cmd.config.name));
+            const filePath = path.join(commandsPath, file);
+            delete require.cache[require.resolve(filePath)];
+            const cmd = require(filePath);
+            
+            // Support both cmd.config.name and cmd.name
+            const cmdName = cmd.config?.name || cmd.name;
+            if (cmdName) {
+                global.GoatBot.commands.set(cmdName.toLowerCase(), cmd);
+                
+                // Support both cmd.config.aliases and cmd.aliases
+                const aliases = cmd.config?.aliases || cmd.aliases;
+                if (aliases) {
+                    const aliasList = Array.isArray(aliases) ? aliases : [aliases];
+                    aliasList.forEach(alias => global.GoatBot.aliases.set(alias.toLowerCase(), cmdName.toLowerCase()));
                 }
             }
         } catch (e) {
@@ -122,7 +130,7 @@ bot.on('message', async (ctx) => {
             try { await ev(ctx); } catch (e) {}
         }
 
-        // 2. Run Command System
+        // 2. Run Command System (Supports both onStart and execute logic)
         const prefix = config.PREFIX || "/";
         if (text.startsWith(prefix)) {
             const args = text.slice(prefix.length).trim().split(/ +/);
@@ -132,7 +140,7 @@ bot.on('message', async (ctx) => {
             if (realCmdName) {
                 const command = global.GoatBot.commands.get(realCmdName);
                 const userRole = getUserRole(Number(senderID));
-                const requiredRole = command.config?.role || 0;
+                const requiredRole = command.config?.role !== undefined ? command.config.role : (command.role || 0);
 
                 if (userRole < requiredRole) {
                     return ctx.reply(`❌ এই কমান্ডটি ব্যবহারের অনুমতি আপনার নেই! (প্রয়োজনীয় রোল: Role ${requiredRole})`);
@@ -152,19 +160,25 @@ bot.on('message', async (ctx) => {
                     userCredits[senderID] -= 1;
                 }
 
-                await command.onStart({
-                    api: apiMock,
-                    event: eventMock,
-                    args,
-                    message: messageMock,
-                    ctx,
-                    userCredits
-                });
+                // Check which execution method the command file uses (onStart or execute)
+                if (typeof command.onStart === 'function') {
+                    await command.onStart({
+                        api: apiMock,
+                        event: eventMock,
+                        args,
+                        message: messageMock,
+                        ctx,
+                        userCredits
+                    });
+                } else if (typeof command.execute === 'function') {
+                    // Support for files like help.js using standard bot/msg execute signature
+                    await command.execute(bot, message, args);
+                }
                 return;
             }
         }
 
-        // 3. Run onChat for Baby (AI) & Autolink
+        // 3. Run onChat for AI / Chatbots
         for (const [_, cmdObj] of global.GoatBot.commands) {
             if (cmdObj.onChat) {
                 try {
@@ -189,7 +203,7 @@ bot.on('message_reaction', async (ctx) => {
 
 function launchBot() {
     bot.launch().then(() => {
-        console.log("🤖 Nijhum Bot active 24/7!");
+        console.log("🤖 Nijhum Bot active 24/7 with full format support!");
     }).catch((err) => {
         console.error("⚠️ Restarting in 5 seconds...", err);
         setTimeout(launchBot, 5000);
