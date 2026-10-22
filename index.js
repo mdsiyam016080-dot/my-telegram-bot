@@ -26,7 +26,7 @@ function getUserRole(userId) {
     return 0;
 }
 
-// Load Commands dynamically supporting both GoatBot and standard formats
+// Load Commands dynamically
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
     const files = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'));
@@ -36,12 +36,9 @@ if (fs.existsSync(commandsPath)) {
             delete require.cache[require.resolve(filePath)];
             const cmd = require(filePath);
             
-            // Support both cmd.config.name and cmd.name
             const cmdName = cmd.config?.name || cmd.name;
             if (cmdName) {
                 global.GoatBot.commands.set(cmdName.toLowerCase(), cmd);
-                
-                // Support both cmd.config.aliases and cmd.aliases
                 const aliases = cmd.config?.aliases || cmd.aliases;
                 if (aliases) {
                     const aliasList = Array.isArray(aliases) ? aliases : [aliases];
@@ -61,8 +58,7 @@ if (fs.existsSync(eventsPath)) {
     const files = fs.readdirSync(eventsPath).filter(f => f.endsWith('.js'));
     for (const file of files) {
         try {
-            const ev = require(path.join(eventsPath, file));
-            eventHandlers.push(ev);
+            eventHandlers.push(require(path.join(eventsPath, file)));
         } catch (e) {}
     }
 }
@@ -74,7 +70,12 @@ bot.on('message', async (ctx) => {
 
         const senderID = String(message.from.id);
         const threadID = String(message.chat.id);
-        const text = message.text || message.caption || "";
+        let text = message.text || message.caption || "";
+
+        // শুধু "/" দিলে অটোমেটিক /help কমান্ড রান হবে
+        if (text.trim() === "/") {
+            text = "/help";
+        }
 
         const apiMock = {
             sendMessage: async (content, tid, cb) => {
@@ -92,45 +93,28 @@ bot.on('message', async (ctx) => {
             },
             sendTypingIndicator: async () => {},
             getUserInfo: async () => ({ [senderID]: { name: message.from.first_name || "jan" } }),
-            setMessageReaction: async (emoji, mid) => {
-                try { await ctx.react(emoji); } catch(e){}
-            },
+            setMessageReaction: async (emoji) => { try { await ctx.react(emoji); } catch(e){} },
             getCurrentUserID: () => bot.botInfo?.id || "bot",
             unsendMessage: async (mid) => { try { await ctx.deleteMessage(mid); } catch(e){} }
         };
 
         const eventMock = {
-            senderID,
-            threadID,
-            messageID: message.message_id,
-            body: text,
-            messageReply: message.reply_to_message ? {
-                messageID: message.reply_to_message.message_id,
-                senderID: String(message.reply_to_message.from.id),
-                body: message.reply_to_message.text || message.reply_to_message.caption,
-                attachments: message.reply_to_message.photo ? [{ type: 'photo', url: 'photo_url' }] : []
-            } : undefined,
+            senderID, threadID, messageID: message.message_id, body: text,
+            messageReply: message.reply_to_message ? { messageID: message.reply_to_message.message_id, senderID: String(message.reply_to_message.from.id), body: message.reply_to_message.text || message.reply_to_message.caption } : undefined,
             attachments: message.photo ? [{ type: 'photo', url: 'photo_url' }] : []
         };
 
         const messageMock = {
-            reply: async (content) => {
-                if (typeof content === 'string') return await ctx.reply(content);
-                if (content.attachment) {
-                    return await ctx.replyWithPhoto(content.attachment, { caption: content.body })
-                            .catch(() => ctx.replyWithVideo(content.attachment, { caption: content.body }));
-                }
-                return await ctx.reply(content.body || "");
-            },
+            reply: async (content) => typeof content === 'string' ? await ctx.reply(content) : await ctx.reply(content.body || ""),
             send: async (content) => ctx.reply(typeof content === 'string' ? content : content.body)
         };
 
-        // 1. Run Events
+        // Run Event Handlers
         for (const ev of eventHandlers) {
             try { await ev(ctx); } catch (e) {}
         }
 
-        // 2. Run Command System (Supports both onStart and execute logic)
+        // Run Command System
         const prefix = config.PREFIX || "/";
         if (text.startsWith(prefix)) {
             const args = text.slice(prefix.length).trim().split(/ +/);
@@ -143,7 +127,7 @@ bot.on('message', async (ctx) => {
                 const requiredRole = command.config?.role !== undefined ? command.config.role : (command.role || 0);
 
                 if (userRole < requiredRole) {
-                    return ctx.reply(`❌ এই কমান্ডটি ব্যবহারের অনুমতি আপনার নেই! (প্রয়োজনীয় রোল: Role ${requiredRole})`);
+                    return ctx.reply(`❌ এই কমান্ডটি ব্যবহারের অনুমতি আপনার নেই!`);
                 }
 
                 if (userRole === 0) {
@@ -160,30 +144,19 @@ bot.on('message', async (ctx) => {
                     userCredits[senderID] -= 1;
                 }
 
-                // Check which execution method the command file uses (onStart or execute)
                 if (typeof command.onStart === 'function') {
-                    await command.onStart({
-                        api: apiMock,
-                        event: eventMock,
-                        args,
-                        message: messageMock,
-                        ctx,
-                        userCredits
-                    });
+                    await command.onStart({ api: apiMock, event: eventMock, args, message: messageMock, ctx, userCredits });
                 } else if (typeof command.execute === 'function') {
-                    // Support for files like help.js using standard bot/msg execute signature
                     await command.execute(bot, message, args);
                 }
                 return;
             }
         }
 
-        // 3. Run onChat for AI / Chatbots
+        // Run onChat (for Baby / Autolink)
         for (const [_, cmdObj] of global.GoatBot.commands) {
             if (cmdObj.onChat) {
-                try {
-                    await cmdObj.onChat({ api: apiMock, event: eventMock, message: messageMock });
-                } catch(e) {}
+                try { await cmdObj.onChat({ api: apiMock, event: eventMock, message: messageMock }); } catch(e) {}
             }
         }
 
@@ -202,8 +175,21 @@ bot.on('message_reaction', async (ctx) => {
 });
 
 function launchBot() {
-    bot.launch().then(() => {
-        console.log("🤖 Nijhum Bot active 24/7 with full format support!");
+    bot.launch().then(async () => {
+        console.log("🤖 Nijhum Bot active 24/7!");
+        try {
+            await bot.telegram.setMyCommands([
+                { command: "help", description: "বটের সাহায্য ও কমান্ডের তালিকা" },
+                { command: "baby", description: "নিঝুম চ্যাটবটের সাথে কথা বলুন" },
+                { command: "edit", description: "এআই ফটো এডিট করুন" },
+                { command: "undress", description: "এআই ফটো প্রসেসিং (Role 2)" },
+                { command: "gan", description: "র্যান্ডম গান শুনুন" },
+                { command: "balance", description: "আপনার ক্রেডিট চেক করুন" },
+                { command: "reset", description: "ক্রেডিট রিসেট করুন (Admin)" },
+                { command: "addadmin", description: "এডমিন রোল পরিবর্তন করুন" },
+                { command: "cmd", description: "কমান্ড ম্যানেজমেন্ট (Admin)" }
+            ]);
+        } catch (e) {}
     }).catch((err) => {
         console.error("⚠️ Restarting in 5 seconds...", err);
         setTimeout(launchBot, 5000);
