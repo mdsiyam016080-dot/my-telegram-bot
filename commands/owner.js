@@ -1,11 +1,11 @@
-const { createCanvas } = require("canvas");
+const { createCanvas, registerFont } = require("canvas");
 const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
+const { Markup } = require("telegraf");
 
-const LOCKED_OWNER_TITLE = "𝆠፝𝐒𝐈𝐘𝐀𝐌-𝐇𝐀𝐒𝐀𝐍";
+const LOCKED_OWNER_TITLE = "SIYAM HASAN";
 
-// Helper: Draw rounded rectangle with custom radiuses
 function drawRoundRect(ctx, x, y, width, height, radius) {
     if (typeof radius === 'number') {
         radius = { tl: radius, tr: radius, br: radius, bl: radius };
@@ -29,11 +29,11 @@ module.exports = {
   config: {
     name: "owner",
     aliases: ["dev", "adminpanel", "siyam"],
-    version: "10.0.0",
-    author: "𝆠፝𝐒𝐈𝐘𝐀𝐌-𝐇𝐀𝐒𝐀𝐍",
+    version: "12.0.0",
+    author: "SIYAM-HASAN",
     role: 2,
     category: "owner",
-    description: "Exclusive powerful owner control panel card"
+    description: "Interactive Premium Owner Control Dashboard"
   },
 
   onStart: async function ({ ctx, args }) {
@@ -41,18 +41,18 @@ module.exports = {
     const action = (args[0] || "").toLowerCase();
     const chatId = ctx.chat.id;
 
+    // Security Check
     const configPath = path.join(__dirname, "../config.json");
     let config = {};
-    try {
-      config = fs.readJsonSync(configPath);
-    } catch (e) {}
+    try { config = fs.readJsonSync(configPath); } catch (e) {}
 
     const adminIds = config.ADMIN_IDS || [];
     if (!adminIds.includes(userId)) {
-      return ctx.reply("🚨 **SECURITY ALERT:** এই কমান্ডটি শুধুমাত্র বটের এক্সক্লুসিভ অনারের জন্য সংরক্ষিত! ❌");
+      return ctx.reply("🚨 ACCESS DENIED: এই কমান্ডটি শুধুমাত্র বটের মূল অনারের জন্য সংরক্ষিত! ❌");
     }
 
-    if (action === "clearcache" || action === "clean") {
+    // --- Action Handlers ---
+    if (action === "clearcache") {
       try {
         const cacheDir = path.join(__dirname, "../cache");
         if (fs.existsSync(cacheDir)) {
@@ -61,177 +61,173 @@ module.exports = {
             fs.unlinkSync(path.join(cacheDir, file));
           }
         }
-        return ctx.reply("🧹 **SUCCESS:** বটের সমস্ত ক্যাশ এবং জাংক ফাইল পরিষ্কার করা হয়েছে!");
+        return ctx.reply("🧹 SUCCESS: বটের সমস্ত জাংক ফাইল ও ক্যাশ মেমোরি খালি করা হয়েছে!");
       } catch (err) {
-        return ctx.reply(`❌ ক্যাশ পরিষ্কার করতে সমস্যা হয়েছে: ${err.message}`);
+        return ctx.reply(`❌ ক্যাশ ফোল্ডার খালি করতে ব্যর্থ: ${err.message}`);
       }
     }
 
-    if (action === "restart" || action === "reboot") {
-      await ctx.reply("🔄 **SYSTEM REBOOT:** সার্ভার পুনরায় চালু করা হচ্ছে...");
-      setTimeout(() => {
-        process.exit(1);
-      }, 1500);
+    if (action === "restart") {
+      await ctx.reply("🔄 SYSTEM REBOOTING: বটটি রিসেট দেওয়া হচ্ছে... কয়েক সেকেন্ডের মধ্যে অটো স্টার্ট হবে।");
+      setTimeout(() => { process.exit(1); }, 1000);
       return;
     }
 
-    // --- CANVAS CARD GENERATION ---
-    const waitMsg = await ctx.reply("⏳ Generating Owner Status Card...", { reply_to_message_id: ctx.message.message_id });
+    // --- CANVAS DASHBOARD CARD GENERATION ---
+    const waitMsg = await ctx.reply("⏳ Loading Owner Interactive Dashboard...", { reply_to_message_id: ctx.message.message_id });
 
     try {
       const uptime = process.uptime();
       const days = Math.floor(uptime / 86400);
       const hours = Math.floor((uptime % 86400) / 3600);
       const minutes = Math.floor((uptime % 3600) / 60);
+      const seconds = Math.floor(uptime % 60);
+
       const memory = process.memoryUsage();
       const usedRAM = (memory.heapUsed / 1024 / 1024).toFixed(1);
       const totalRAM = (os.totalmem() / 1024 / 1024 / 1024).toFixed(1);
       const cpuLoad = os.loadavg()[0].toFixed(2);
       const platform = os.platform().toUpperCase();
 
-      const width = 950;
-      const height = 550;
+      const width = 1000;
+      const height = 520;
       const canvas = createCanvas(width, height);
       const c = canvas.getContext("2d");
 
-      // Background Gradient
+      // Deep Cyberpunk Dark Gradient
       const bg = c.createLinearGradient(0, 0, width, height);
-      bg.addColorStop(0, "#05050c");
-      bg.addColorStop(0.5, "#0d0f1d");
-      bg.addColorStop(1, "#04050a");
+      bg.addColorStop(0, "#080b14");
+      bg.addColorStop(0.5, "#0f172a");
+      bg.addColorStop(1, "#020617");
       c.fillStyle = bg;
       c.fillRect(0, 0, width, height);
 
-      // Glowing Neon Orbs
-      const orb1 = c.createRadialGradient(150, 150, 10, 150, 150, 300);
-      orb1.addColorStop(0, "rgba(0, 245, 212, 0.2)");
+      // Cyber Neon Lighting Background
+      const orb1 = c.createRadialGradient(200, 100, 20, 200, 100, 400);
+      orb1.addColorStop(0, "rgba(56, 189, 248, 0.25)");
       orb1.addColorStop(1, "transparent");
       c.fillStyle = orb1;
       c.fillRect(0, 0, width, height);
 
-      const orb2 = c.createRadialGradient(800, 450, 10, 800, 450, 350);
-      orb2.addColorStop(0, "rgba(255, 0, 127, 0.18)");
+      const orb2 = c.createRadialGradient(800, 400, 20, 800, 400, 450);
+      orb2.addColorStop(0, "rgba(236, 72, 153, 0.22)");
       orb2.addColorStop(1, "transparent");
       c.fillStyle = orb2;
       c.fillRect(0, 0, width, height);
 
-      // Main Outer Card Box with Glowing Cyan/Purple Border
+      // Card Outer Glow Frame
       c.save();
-      c.shadowColor = "rgba(0, 245, 212, 0.35)";
+      c.shadowColor = "#38bdf8";
       c.shadowBlur = 25;
-      drawRoundRect(c, 25, 25, width - 50, height - 50, 24);
-      c.fillStyle = "rgba(10, 12, 24, 0.95)";
+      drawRoundRect(c, 30, 30, width - 60, height - 60, 24);
+      c.fillStyle = "rgba(15, 23, 42, 0.94)";
       c.fill();
       c.restore();
 
-      c.strokeStyle = "#00f5d4";
-      c.lineWidth = 2.5;
-      drawRoundRect(c, 25, 25, width - 50, height - 50, 24);
+      c.strokeStyle = "rgba(56, 189, 248, 0.6)";
+      c.lineWidth = 2;
+      drawRoundRect(c, 30, 30, width - 60, height - 60, 24);
       c.stroke();
 
-      // Header Banner (Cyan to Magenta Gradient)
-      const headerGrad = c.createLinearGradient(45, 45, width - 45, 45);
-      headerGrad.addColorStop(0, "#00f5d4");
-      headerGrad.addColorStop(0.5, "#7000ff");
-      headerGrad.addColorStop(1, "#ff007f");
+      // Header Banner
+      const headerGrad = c.createLinearGradient(50, 50, width - 50, 50);
+      headerGrad.addColorStop(0, "#38bdf8");
+      headerGrad.addColorStop(0.5, "#818cf8");
+      headerGrad.addColorStop(1, "#ec4899");
       c.fillStyle = headerGrad;
-      drawRoundRect(c, 45, 45, width - 90, 65, 14);
+      drawRoundRect(c, 50, 50, width - 100, 70, 16);
       c.fill();
 
-      c.font = "bold 28px sans-serif";
+      // Clean English Text Only (Prevents Canvas Character Glitches)
+      c.font = "bold 32px sans-serif";
       c.fillStyle = "#ffffff";
       c.textAlign = "center";
-      c.fillText("👑 EXCLUSIVE OWNER CONTROL PANEL 👑", width / 2, 87);
+      c.fillText("OWNER COMMAND & CONTROL DASHBOARD", width / 2, 95);
 
-      // Function to draw separate styled info boxes with unique colors & borders
-      function drawInfoBox(x, y, w, h, title, value, accentColor) {
+      // Box Drawer Function
+      function drawMetricBox(x, y, w, h, title, value, accentColor) {
         c.save();
-        // Inner Box Background
-        c.fillStyle = "rgba(20, 24, 45, 0.9)";
-        drawRoundRect(c, x, y, w, h, 12);
+        c.fillStyle = "rgba(30, 41, 59, 0.85)";
+        drawRoundRect(c, x, y, w, h, 14);
         c.fill();
 
-        // Left Colored Accent Line
         c.shadowColor = accentColor;
-        c.shadowBlur = 10;
+        c.shadowBlur = 12;
         c.fillStyle = accentColor;
-        drawRoundRect(c, x, y, 6, h, { tl: 12, bl: 12, tr: 0, br: 0 });
+        drawRoundRect(c, x, y, 6, h, { tl: 14, bl: 14, tr: 0, br: 0 });
         c.fill();
         c.restore();
 
-        // Box Border
-        c.strokeStyle = "rgba(255, 255, 255, 0.08)";
+        c.strokeStyle = "rgba(255, 255, 255, 0.1)";
         c.lineWidth = 1;
-        drawRoundRect(c, x, y, w, h, 12);
+        drawRoundRect(c, x, y, w, h, 14);
         c.stroke();
 
-        // Text Labels (No overlapping, perfectly aligned)
         c.textAlign = "left";
         c.font = "bold 15px sans-serif";
         c.fillStyle = "#94a3b8";
-        c.fillText(title, x + 22, y + 28);
+        c.fillText(title, x + 24, y + 30);
 
-        c.font = "bold 22px sans-serif";
+        c.font = "bold 24px sans-serif";
         c.fillStyle = "#ffffff";
-        c.fillText(value, x + 22, y + 60);
+        c.fillText(value, x + 24, y + 65);
       }
 
-      // Grid Boxes (Each box has unique accent color and clear spacing)
-      drawInfoBox(50, 135, 265, 85, "SUPREME OWNER", LOCKED_OWNER_TITLE, "#00f5d4");
-      drawInfoBox(342, 135, 265, 85, "SYSTEM UPTIME", `${days}d ${hours}h ${minutes}m`, "#34d399");
-      drawInfoBox(635, 135, 265, 85, "MEMORY (RAM)", `${usedRAM} / ${totalRAM} GB`, "#fbbf24");
+      // Metric Grid (3x2)
+      drawMetricBox(60, 150, 275, 95, "SYSTEM OWNER", LOCKED_OWNER_TITLE, "#38bdf8");
+      drawMetricBox(362, 150, 275, 95, "SYSTEM UPTIME", `${days}d ${hours}h ${minutes}m ${seconds}s`, "#34d399");
+      drawMetricBox(665, 150, 275, 95, "HEAP MEMORY", `${usedRAM} MB / ${totalRAM} GB`, "#facc15");
 
-      drawInfoBox(50, 240, 265, 85, "NODE.JS VERSION", process.version, "#c084fc");
-      drawInfoBox(342, 240, 265, 85, "CPU LOAD", `${cpuLoad}`, "#22d3ee");
-      drawInfoBox(635, 240, 265, 85, "PLATFORM", `${platform}`, "#ff007f");
+      drawMetricBox(60, 270, 275, 95, "NODE VERSION", process.version, "#c084fc");
+      drawMetricBox(362, 270, 275, 95, "CPU LOAD", `${cpuLoad}`, "#22d3ee");
+      drawMetricBox(665, 270, 275, 95, "HOST OS", `${platform}`, "#ec4899");
 
-      // Bottom Command Guide Box
-      c.fillStyle = "rgba(18, 22, 40, 0.95)";
-      drawRoundRect(c, 50, 345, 850, 160, 14);
+      // Footer Banner
+      c.fillStyle = "rgba(30, 41, 59, 0.9)";
+      drawRoundRect(c, 60, 390, 880, 70, 14);
       c.fill();
 
-      c.strokeStyle = "rgba(112, 0, 255, 0.4)";
-      c.lineWidth = 2;
-      drawRoundRect(c, 50, 345, 850, 160, 14);
-      c.stroke();
-
-      c.textAlign = "left";
+      c.textAlign = "center";
       c.font = "bold 18px sans-serif";
-      c.fillStyle = "#00f5d4";
-      c.fillText("⚡ EXCLUSIVE OWNER COMMANDS:", 75, 380);
+      c.fillStyle = "#38bdf8";
+      c.fillText("CONTROL PANEL READY • SELECT AN ACTION BUTTON BELOW", width / 2, 432);
 
-      c.font = "bold 16px sans-serif";
-      c.fillStyle = "#e2e8f0";
-      c.fillText("📌 /owner restart  ➔  সার্ভার বা বট ইনস্ট্যান্ট রিস্টার্ট করুন", 75, 420);
-      c.fillText("📌 /owner clearcache  ➔  ক্যাশ ফোল্ডারের সমস্ত জাংক ফাইল মুছুন", 75, 455);
-      
-      c.font = "14px sans-serif";
-      c.fillStyle = "#94a3b8";
-      c.fillText("🔒 Restricted Secure Zone • NIJHUM CHATBOT SYSTEM", 75, 485);
-
-      // Save image to cache
+      // Save Image
       const cacheDir = path.join(__dirname, "../cache");
       await fs.ensureDir(cacheDir);
-      const imgPath = path.join(cacheDir, `owner_${Date.now()}.png`);
+      const imgPath = path.join(cacheDir, `owner_card_${Date.now()}.png`);
       await fs.writeFile(imgPath, canvas.toBuffer("image/png"));
 
-      try {
-        await ctx.telegram.deleteMessage(chatId, waitMsg.message_id);
-      } catch (e) {}
+      try { await ctx.telegram.deleteMessage(chatId, waitMsg.message_id); } catch (e) {}
 
+      // Interactive Telegram Inline Keyboard (Clickable Buttons)
       const captionText = 
-`👑 𝗘𝗫𝗖𝗟𝗨𝗦𝗜𝗩𝗘 𝗢𝗪𝗡𝗘𝗥 𝗣𝗔𝗡𝗘𝗟 👑
+`👑 <b>SYSTEM OWNER CONTROL PANEL</b> 👑
 ━━━━━━━━━━━━━━━━━━━━
-👤 𝗢𝘄𝗻𝗲𝗿: ${LOCKED_OWNER_TITLE}
-⏱️ 𝗨𝗽𝘁𝗶𝗺𝗲: ${days}d ${hours}h ${minutes}m
-🧠 𝗥𝗔𝗠: ${usedRAM} MB / ${totalRAM} GB
-⚡ 𝗦𝘁𝗮𝘁𝘂𝘀: 𝗦𝗲𝗰𝘂𝗿𝗲 & 𝗢𝗻𝗹𝗶𝗻𝗲
+👤 <b>Owner:</b> <code>${LOCKED_OWNER_TITLE}</code>
+⏱️ <b>Uptime:</b> <code>${days}d ${hours}h ${minutes}m ${seconds}s</code>
+🧠 <b>RAM:</b> <code>${usedRAM} MB / ${totalRAM} GB</code>
+⚡ <b>Status:</b> <code>ACTIVE & SECURE</code>
 ━━━━━━━━━━━━━━━━━━━━
-✨ *This is a private secure zone restricted only to the supreme creator.*`;
+👇 <b>নিচের বাটনগুলোতে ক্লিক করে বটের কাজ সিলেক্ট করুন:</b>`;
 
       await ctx.replyWithPhoto({ source: imgPath }, {
         caption: captionText,
-        reply_to_message_id: ctx.message.message_id
+        parse_mode: "HTML",
+        reply_to_message_id: ctx.message.message_id,
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback("🔄 Restart Bot", "owner_action_restart"),
+            Markup.button.callback("🧹 Clear Cache", "owner_action_clearcache")
+          ],
+          [
+            Markup.button.callback("📊 Check Uptime", "owner_action_uptime"),
+            Markup.button.callback("📜 Command List", "owner_action_cmd")
+          ],
+          [
+            Markup.button.url("👤 Developer Telegram", "https://t.me/ri_siyam")
+          ]
+        ])
       });
 
       setTimeout(() => {
@@ -239,11 +235,9 @@ module.exports = {
       }, 15000);
 
     } catch (err) {
-      console.error("Owner Card Error:", err);
-      try {
-        await ctx.telegram.deleteMessage(chatId, waitMsg.message_id);
-      } catch (e) {}
-      return ctx.reply(`❌ অনার কার্ড তৈরি করতে সমস্যা হয়েছে: ${err.message}`);
+        console.error("Owner Card Error:", err);
+        try { await ctx.telegram.deleteMessage(chatId, waitMsg.message_id); } catch (e) {}
+        return ctx.reply(`❌ ড্যাশবোর্ড তৈরি করতে সমস্যা হয়েছে: ${err.message}`);
     }
   }
 };
